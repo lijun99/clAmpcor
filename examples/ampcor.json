@@ -1,0 +1,47 @@
+{
+  "_comment": "Ampcor Settings",
+  "reference": {
+    "slc": "20130819.slc",
+    "width": 19662,
+    "height": 55296
+  },
+  "secondary": {
+    "slc": "20130823.slc",
+    "width": 19662,
+    "height": 55296
+  },
+  "offset": {
+    "slc": "offset.slc",
+    "width": 0,
+    "height": 0,
+    "_comment": "specify #windows to compute or use 0 to be determined by skip"
+  },
+  "window": {
+    "width": 64,
+    "height": 64,
+    "_comment": "template window size"
+  },
+  "half_search_range": {
+    "across": 16,
+    "down": 16,
+    "_comment": "(half) search range"
+  },
+  "skip_between_windows": {
+    "across": 128,
+    "down": 128,
+    "_comment": "skip in neighboring windows"
+  },
+  "start_pixel_secondary": {
+    "across": 128,
+    "down": 128,
+    "_comment": "the CENTER of first window in secondary image"
+  },
+  "end_pixel_secondary": {
+    "_comment": "the CENTER of last window. If not specified, use the last possible pixel"
+  },
+  "correlation_surface_zoom_in": {
+    "half_range": 4,
+    "oversampling_factor": 16,
+    "_comment": "correlation window to oversample around the peak"
+  }
+}
