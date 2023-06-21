@@ -1,12 +1,165 @@
 
 #include "clHelper.h"
 
+std::ostream& operator<<(std::ostream& os, const cl_int2& vec) {
+    os << "(" << vec.x << ", " << vec.y << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const cl_float2& vec) {
+    os << "(" << vec.x << ", " << vec.y << ")";
+    return os;
+}
+
+cl_int2 make_int2(const int&a, const int& b)
+{
+    cl_int2 c;
+    c.x = a;
+    c.y = b;
+    return c;
+}
+
+template <typename T>
+void buffer_debug(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str)
+{
+    T*  mappedPtr = new T[width*height];
+    CL_CHECK_ERROR(queue.enqueueReadBuffer(
+        buffer, // buffer (device)
+        CL_TRUE, // blocking
+        0, // offset
+        width*height*sizeof(T),
+        mappedPtr));
+
+        std::cout << str << "\n";
+        for(int j=0; j<height; j++) {
+            if (j<ELEMENTS_TO_SHOW || height-j < ELEMENTS_TO_SHOW) {
+                for(int i=0; i<width; i++)
+                {
+                    if(i<ELEMENTS_TO_SHOW || width-i < ELEMENTS_TO_SHOW)
+                        std::cout  << mappedPtr[j*width+i] << " ";
+                }
+                std::cout << "\n";
+            }
+        }
+}
+
+// explicit instantiations
+template void buffer_debug<cl_float2>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_debug<cl_int2>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_debug<cl_float>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_debug<cl_int>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+
+template <typename T>
+void buffer_print(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str)
+{
+    std::cout << str << "\n";
+    std::vector<T> mappedPtr(width*height);
+    CL_CHECK_ERROR(queue.enqueueReadBuffer(
+        buffer, // buffer (device)
+        CL_TRUE, // blocking
+        0, // offset
+        width*height*sizeof(T),
+        mappedPtr.data()));
+
+    for(int j=0; j<height; j++) {
+        for(int i=0; i< width; i++) {
+            std::cout  << mappedPtr[j*width+i] << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+// explicit instantiations
+template void buffer_print<cl_float2>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_print<cl_int2>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_print<cl_float>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+template void buffer_print<cl_int>(cl::CommandQueue& queue, cl::Buffer& buffer,
+    const int width, const int height, std::string str);
+
+
+bool is_power_of_2(const ::size_t n)
+{
+    return n && !(n & (n - 1));
+}
+
+cl::size_type next_power_of_2(const int n)
+{
+    cl::size_type r = 1;
+    while (r<n)
+        r<<=1;
+    return r;
+}
+
+cl::Program buildCLProgramFromString(cl::Context& context, std::string& source)
+{
+    // initiate the program
+    cl::Program program(context, source);
+    // build cl kernels and check errors (at runtime)
+    try {
+        program.build(CL_AMPCOR_BUILD_OPTIONS);
+    } catch (const cl::Error& e) {
+        if (e.err() == CL_BUILD_PROGRAM_FAILURE) {
+            // Print the build log if there was an error
+            cl::string buildLog;
+            program.getBuildInfo(context.getInfo<CL_CONTEXT_DEVICES>()[0], CL_PROGRAM_BUILD_LOG, &buildLog);
+            std::cerr << "Build log:\n" << buildLog << std::endl;
+        }
+        throw e;
+    }
+    // upon success, return
+    return program;
+}
+
+clHandle::clHandle() {
+    initialize();
+}
+
+clHandle::clHandle(cl_device_type devType) : deviceType(devType){
+    initialize();
+}
+
+void clHandle::initialize()
+{
+    // get platforms
+    CL_CHECK_ERROR(cl::Platform::get(&platforms));
+    if (platforms.empty()) {
+        std::cerr << "No OpenCL platforms found!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    // get gpu devices
+    CL_CHECK_ERROR(platforms[0].getDevices(deviceType, &devices));
+    if (devices.empty()) {
+        std::cerr << "No OpenCL Devices found!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // set up context
+    CL_CHECK_ERROR(context = cl::Context(devices));
+    // use device 0 as default
+    setDevice(0);
+}
+
+void clHandle::setDevice(const int devID)
+{
+    device = devices[devID];
+}
+
+
 char *getCLErrorString(cl_int err){
 
     switch (err) {
         case CL_SUCCESS:                          return (char *) "Success!";
-        case CL_DEVICE_NOT_FOUND:                 return (char *) "Device not found.";
-        case CL_DEVICE_NOT_AVAILABLE:             return (char *) "Device not available";
+        case CL_DEVICE_NOT_FOUND:                 return (char *) "No OpenCL devices that matched the specified criteria were found.";
+        case CL_DEVICE_NOT_AVAILABLE:             return (char *) "The device is currently unavailable.";
         case CL_COMPILER_NOT_AVAILABLE:           return (char *) "Compiler not available";
         case CL_MEM_OBJECT_ALLOCATION_FAILURE:    return (char *) "Memory object allocation failure";
         case CL_OUT_OF_RESOURCES:                 return (char *) "Out of resources";
@@ -53,50 +206,4 @@ char *getCLErrorString(cl_int err){
         default:                                  return (char *) "Unknown";
     }
 }
-
-
 //end of file
-
- /**************************
-        CL_SUCCESS (0): Success
-        CL_DEVICE_NOT_FOUND (-1): No OpenCL devices that matched the specified criteria were found
-        CL_DEVICE_NOT_AVAILABLE (-2): The device is currently unavailable
-        CL_COMPILER_NOT_AVAILABLE (-3): The compiler is not available
-        CL_MEM_OBJECT_ALLOCATION_FAILURE (-4): Failed to allocate memory on the device
-        CL_OUT_OF_RESOURCES (-5): Failed to allocate resources on the device
-        CL_OUT_OF_HOST_MEMORY (-6): Failed to allocate resources on the host
-        CL_PROFILING_INFO_NOT_AVAILABLE (-7): Profiling information is not available
-        CL_MEM_COPY_OVERLAP (-8): The source and destination memory regions overlap
-        CL_IMAGE_FORMAT_MISMATCH (-9): The image format is not compatible with the device
-        CL_IMAGE_FORMAT_NOT_SUPPORTED (-10): The image format is not supported by the device
-        CL_BUILD_PROGRAM_FAILURE (-11): Failed to build the program executable
-        CL_MAP_FAILURE (-12): Failed to map the requested region into the host address space
-        CL_MISALIGNED_SUB_BUFFER_OFFSET (-13): The sub-buffer offset is not aligned to CL_DEVICE_MEM_BASE_ADDR_ALIGN
-        CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST (-14): An event in the wait list returned an error status
-        CL_COMPILE_PROGRAM_FAILURE (-15): Failed to compile the program source code
-        CL_LINKER_NOT_AVAILABLE (-16): The linker is not available
-        CL_LINK_PROGRAM_FAILURE (-17): Failed to link the compiled program object(s)
-        CL_DEVICE_PARTITION_FAILED (-18): Failed to partition the device
-        CL_KERNEL_ARG_INFO_NOT_AVAILABLE (-19): Kernel argument information is not available
-        CL_INVALID_VALUE (-30): One or more argument values are invalid
-        CL_INVALID_DEVICE_TYPE (-31): The device type specified is not valid
-        CL_INVALID_PLATFORM (-32): The platform specified is not valid
-        CL_INVALID_DEVICE (-33): The device specified is not valid
-        CL_INVALID_CONTEXT (-34): The context specified is not valid
-        CL_INVALID_QUEUE_PROPERTIES (-35): The specified queue properties are not supported by the device
-        CL_INVALID_COMMAND_QUEUE (-36): The command queue specified is not valid
-        CL_INVALID_HOST_PTR (-37): The host pointer specified is not valid
-        CL_INVALID_MEM_OBJECT (-38): The memory object specified is not valid
-        CL_INVALID_IMAGE_FORMAT_DESCRIPTOR (-39): The image format specified is not valid
-        CL_INVALID_IMAGE_SIZE (-40): The specified image size is not valid
-        CL_INVALID_SAMPLER (-41): The specified sampler is not valid
-        CL_INVALID_BINARY (-42): The binary program is not valid
-        CL_INVALID_BUILD_OPTIONS (-43): The specified build options are not valid
-        CL_INVALID_PROGRAM (-44): The specified program is not valid
-        CL_INVALID_PROGRAM_EXECUTABLE (-45): The program executable specified is not valid
-        CL_INVALID_KERNEL_NAME (-46): The kernel name specified is not valid
-        CL_INVALID_KERNEL_DEFINITION (-47): The kernel definition specified is not valid
-        CL_INVALID_KERNEL (-48): The kernel specified is not valid
-        CL_INVALID_ARG_INDEX (-49): The argument index specified is not valid
-        CL_INVALID_ARG_VALUE (-50): The argument
-    ***********************/

@@ -4,7 +4,7 @@
 
 ### Snapdragon™ 855 Mobile HDK (HDK 8150) - currently tested
 #### Specifications
- - Qualcomm® Kryo™ 485 CPU 
+ - Qualcomm® Kryo™ 485 CPU (ARMv8.2-A)
    - One high-performance Gold Prime core targeting 2.7+ GHz
    - Three high-performance Gold cores targeting 2.4+ GHz
    - Four low-power Kryo cores targeting 1.7 GHz
@@ -17,13 +17,13 @@
  - 6GB LPDDR4x RAM 4266 Quad-channel 16-bit (64-bit) @ 2133 MHz (34.1 GB/s)
 
 #### OpenCL Profile
-Device: QUALCOMM Adreno(TM)
-Vendor: QUALCOMM
-OpenCL Version: OpenCL 2.0 Adreno(TM) 640
-Max Compute Units: 2
-Max Work Group Size: 1024
-Local Memory Size: 32 KB
-Global Memory Size: 2752 MB
+- Device: QUALCOMM Adreno(TM)
+- Vendor: QUALCOMM
+- OpenCL Version: OpenCL 2.0 Adreno(TM) 640
+- Max Compute Units: 2
+- Max Work Group Size: 1024
+- Local Memory Size: 32 KB
+- Global Memory Size: 2752 MB
 
 ### Snapdragon™ 8 Gen 1 Mobile Hardware Development Kit (HDK 8450)
  - Qualcomm® Kryo™ 780 CPU (ARMv9)

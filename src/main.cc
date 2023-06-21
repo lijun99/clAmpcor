@@ -6,7 +6,7 @@
 
 
 int main() {
-    cl::Ampcor ampcor;
+    cl::Ampcor::Ampcor ampcor;
     ampcor.run();
     std::cout <<  "All done! \n";
     return 0;

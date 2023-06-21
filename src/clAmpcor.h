@@ -5,14 +5,14 @@
  */
 
 // code guard
-#ifndef __CLAMPCOR_H__
-#define __CLAMPCOR_H__
+#pragma once
 
 #include <string>
 #include "clHelper.h"
 
+
 // wrapped in a namesapce
-namespace cl {
+namespace cl { namespace Ampcor {
 
 struct Ampcor {
 
@@ -43,29 +43,29 @@ struct Ampcor {
     // chip or window size for raw data
     int_type windowHeightRaw;        ///< Template window height (original size)
     int_type windowWidthRaw;         ///< Template window width (original size)
-    int_type searchWindowHeightRaw;  ///< Search window height (original size)
-    int_type searchWindowWidthRaw;   ///< Search window width (orignal size)
+    int_type secondaryWindowHeightRaw;  ///< Search window height (original size)
+    int_type secondaryWindowWidthRaw;   ///< Search window width (original size)
 
-    int_type halfSearchRangeDownRaw;   ///< (searchWindowHeightRaw-windowHeightRaw)/2
-    int_type halfSearchRangeAcrossRaw;    ///< (searchWindowWidthRaw-windowWidthRaw)/2
-    // search range is (-halfSearchRangeRaw, halfSearchRangeRaw)
+    int_type halfSearchRangeDownRaw;   ///< (secondaryWindowHeightRaw-windowHeightRaw)/2
+    int_type halfSearchRangeAcrossRaw;    ///< (secondaryWindowWidthRaw-windowWidthRaw)/2
+    // secondary range is (-halfSearchRangeRaw, halfSearchRangeRaw)
 
-    int_type searchWindowHeightRawZoomIn; ///< search window height used for zoom in
-    int_type searchWindowWidthRawZoomIn;  ///< search window width used for zoom in
+    int_type secondaryWindowHeightRawZoomIn; ///< secondary window height used for zoom in
+    int_type secondaryWindowWidthRawZoomIn;  ///< secondary window width used for zoom in
 
     // chip or window size after oversampling
     const int_type rawDataOversamplingFactor=1;  ///< Raw data overampling factor (from original size to oversampled size)
     int_type windowHeight;           ///< Template window length (oversampled size)
     int_type windowWidth;            ///< Template window width (original size)
-    int_type searchWindowHeight;     ///< Search window height (oversampled size)
-    int_type searchWindowWidth;      ///< Search window width (oversampled size)
+    int_type secondaryWindowHeight;     ///< Search window height (oversampled size)
+    int_type secondaryWindowWidth;      ///< Search window width (oversampled size)
 
     // strides between chips/windows
     int_type skipSampleDown;   ///< Skip size between neighboring windows in Down direction (original size)
     int_type skipSampleAcross; ///< Skip size between neighboring windows in across direction (original size)
 
     // correlation surface size
-    int_type corrStatWindowSize;     ///< correlation surface size used to estimate snr
+    int_type correlationSurfaceStatSize;     ///< correlation surface size used to estimate snr
     int_type correlationSurfaceWidth; ///< correlation surface size for raw data xcor
     int_type correlationSurfaceHeight;
 
@@ -94,6 +94,5 @@ struct Ampcor {
 
 };
 
-} // end of namespace
-#endif //__CLAMPCOR_PARAMETERS_H__
- // end of file
+} }// end of namespace
+// end of file

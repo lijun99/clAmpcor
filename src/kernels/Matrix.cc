@@ -1,28 +1,25 @@
-// collections of ampcor opencl kernels
+///
+/// @file Kernels.cc
+/// @brief A collection of ampcor opencl kernels
+///
 
-// enclosed in a string variable
+// CL Kernels enclosed in a string variable
+std::string Matrix_CL_code = R"(
 
-std::string kernelCode = R"(
-
-    #define COS native_cos
-    #define SIN native_sin
-
-    //#ifndef FLT_EPSILON
-    //    #define FLT_EPSILON 1.19209290E-07F
-    //#endif
-
-    // take amplitudes of the complex image
-    __kernel void complex_amplitude(
+    // take amplitudes in a rect region (width, length) of the complex image
+    //   with size (p_width, p_height);
+    // set zeros to the rest
+    __kernel void matrix_complex_amplitude(
         __global float2* image,
-        const int width, const int height // region to take amplitude
+        const int width, const int height, // work region
+        const int p_width, const int p_height // whole image
         )
     {
-        int x = get_global_id(0);
-        int y = get_global_id(1);
-        int p_width = get_global_size(0);
-        int p_height = get_global_size(1);
-        int index = y * p_width + x;
-        if(x < width && y < height)
+        int col = get_global_id(0);
+        int row = get_global_id(1);
+
+        int index =  mad24(row, p_width, col);
+        if(row < height && col < width)
         {
             float2 pixel = image[index];
             float amplitude = length(pixel);
@@ -34,11 +31,10 @@ std::string kernelCode = R"(
     }
 
     // fill the image with 0
-    __kernel void complex_fill_zero(
-        __global float2* image,
-        const int length)
+    __kernel void matrix_fill_zero(
+        __global float2* image)
     {
-        unsigned int i = get_global_id(0);
+        const int i = get_global_id(0);
         image[i] = (float2)(0.0f, 0.0f);
     }
 
@@ -47,83 +43,22 @@ std::string kernelCode = R"(
         const int length,
         const float value)
     {
-        unsigned int i = get_global_id(0);
+        const int i = get_global_id(0);
         image[i] = (float2)(value, 0.0f);
     }
 
-    inline float2 complex_mul(const float2 a, const float2 b)
-    {
-        return (float2)(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x);
-    }
-
-    // OpenCL kernel for 2D Fast Fourier Transform (FFT) along columns
-    __kernel void fft2d(__global const float2* input,
-        __global float2* output,
-        const int width, const int height)
-    {
-        int x = get_global_id(0);  // Column index
-        int y = get_global_id(1);  // Row index
-
-        float2 sum = {0.0f, 0.0f};
-        for (int i = 0; i< width ; i++)
-        {
-            float var = 2.0f * M_PI_F * x * i / (float)width;
-            float2 twiddlex = (float2)(COS(var), -SIN(var));
-
-            for (int j = 0; j < height; j++)
-            {
-                var = 2.0f * M_PI_F * y * j / (float)height;
-                float2 twiddley = (float2)(COS(var), -SIN(var));
-                float2 twiddle = complex_mul(twiddlex, twiddley);
-                sum +=  complex_mul(input[j * width + i], twiddle);
-            }
-        }
-        output[y * width + x] = sum;
-    }
-
-        // OpenCL kernel for 2D Fast Fourier Transform (FFT) along columns
-    __kernel void ifft2d(__global const float2* input,
-        __global float2* output,
-        const int width, const int height)
-    {
-        int x = get_global_id(0);  // Column index
-        int y = get_global_id(1);  // Row index
-
-        float2 sum = {0.0f, 0.0f};
-        for (int i = 0; i< width ; i++)
-        {
-            float var = 2.0f * M_PI_F * x * i / (float)width;
-            float2 twiddlex = (float2)(COS(var), SIN(var));
-
-            for (int j = 0; j < height; j++)
-            {
-                var = 2.0f * M_PI_F * y * j / (float)height;
-                float2 twiddley = (float2)(COS(var), SIN(var));
-                float2 twiddle = complex_mul(twiddlex, twiddley);
-                sum +=  complex_mul(input[j * width + i], twiddle);
-            }
-        }
-        output[y * width + x] = sum/(float)(height*width);
-    }
-
-    inline float2 complex_mul_conj(const float2 a, const float2 b)
-    {
-        return (float2)(a.x*b.x+a.y*b.y, a.x*b.y-a.y*b.x);
-    }
-
-    __kernel void complex_matrix_element_multiply_conj(
+    // width / height is the actual buffer size
+    // actual rectangle area is controlled by global_size(0) (1)
+    __kernel void matrix_element_multiply_conj(
         __global const float2* matrixA,
         __global const float2* matrixB,
         __global float2* result,
         const int width,
         const int height)
     {
-        const int x = get_global_id(0);
-        const int y = get_global_id(1);
-
-        if (x >= width || y >= height) return;
-
-        const int index = y * width + x;
+        const int col = get_global_id(0);
+        const int row = get_global_id(1);
+        const int index = mad24(row, width, col);
 
         result[index] = complex_mul_conj(matrixA[index], matrixB[index]);
     }
@@ -134,29 +69,29 @@ std::string kernelCode = R"(
         __global const float2* input,
         __global float2* output,
         const int in_width, const int in_height,
-        const int out_width, const int out_height,
-        const int origin_x, const int origin_y)
+        const int in_stride,
+        __global const int2* max_loc,
+        const int offsetx, const int offsety)
     {
         const int idx = get_global_id(0);
         const int idy = get_global_id(1);
+        const int out_width = get_global_size(0);
 
-        const int in_idx = idx + origin_x;
-        const int in_idy = idy + origin_y;
-        const int out_index = idy * out_width + idx;
+        const int in_idx = idx + max_loc[0].x + offsetx;
+        const int in_idy = idy + max_loc[0].y + offsety;
 
         if(in_idx>=0 && in_idx<in_width && in_idy>=0 && in_idy<in_height)
         {
-            const int in_index = idy* in_width  + idx;
-            output[out_index] = (float2)(input[in_index].x, 0.0f);
+            output[mad24(idy, out_width, idx)] = (float2)(input[mad24(in_idy, in_stride, in_idx)].x, 0.0f);
         }
         else{
-            output[out_index] = (float2)(0.0f, 0.0f);
+            output[mad24(idy, out_width, idx)] = (float2)(0.0f, 0.0f);
         }
     }
 
     // fft2d padding zeros in the middle
     // this kernel is called with globalSize = {out_width/2, out_height/2}
-    __kernel void fft2d_padding(
+    __kernel void matrix_fft_padding(
         __global const float2* input,
         __global float2* output,
         const int in_width, const int in_height,
@@ -165,24 +100,28 @@ std::string kernelCode = R"(
         const int idx = get_global_id(0);
         const int idy = get_global_id(1);
 
+        const int half_in_width = in_width >> 1;
+        const int half_in_height = in_height >> 1;
+
         // region to copy
-        if(idx < in_width/2 && idy < in_height/2)
+        if(idx < half_in_width && idy < half_in_height)
         {
             // top left quadrature
-            output[idy*out_width + idx] = input[idy*in_width + idx];
+            output[mad24(idy, out_width, idx)] = input[mad24(idy, in_width, idx)];
             // top right quadrature
-            output[idy*out_width+(out_width-idx-1)] = input[idy*in_width+(in_width-idx-1)];
+            output[mad24(idy, out_width, out_width-idx-1)]
+                = input[mad24(idy, in_width, in_width-idx-1)];
             // bottom left quadrature
-            output[(out_height-idy-1)*out_width+(idx)] = input[(in_height-idy-1)*in_width+(idx)];
+            output[mad24(out_height-idy-1, out_width, idx)] = input[mad24(in_height-idy-1, in_width, idx)];
             // bottom right quadrature
-            output[(out_height-idy-1)*out_width+(out_width-idx-1)]
-                = input[(in_height-idy-1)*in_width+(in_width-idx-1)];
+            output[mad24(out_height-idy-1, out_width, out_width-idx-1)]
+                = input[mad24(in_height-idy-1, in_width, in_width-idx-1)];
         }
         else { // pad zero
-            output[idy*out_width + idx] = (float2)(0.0f, 0.0f);
-            output[idy*out_width+(out_width-idx-1)] = (float2)(0.0f, 0.0f);
-            output[(out_height-idy-1)*out_width+(idx)] = (float2)(0.0f, 0.0f);
-            output[(out_height-idy-1)*out_width+(idx)] = (float2)(0.0f, 0.0f);
+            output[mad24(idy, out_width,  idx)] = (float2)(0.0f, 0.0f);
+            output[mad24(idy, out_width, out_width-idx-1)] = (float2)(0.0f, 0.0f);
+            output[mad24(out_height-idy-1, out_width, idx)] = (float2)(0.0f, 0.0f);
+            output[mad24(out_height-idy-1, out_width, out_width-idx-1)] = (float2)(0.0f, 0.0f);
         }
     }
 
@@ -205,14 +144,13 @@ std::string kernelCode = R"(
 
         int n = regionx*regiony;
 			// Compute partial sum in each work-item
-		while (globalIndex < n)
+		for (int i = globalIndex; i < n; i+=get_global_size(0))
 		{
-            int row = globalIndex / regionx;
-            int col = globalIndex % regionx;
+            int row = i / regionx;
+            int col = i % regionx;
 		    float val = input[row*width+col].x;
 			local_sum[localIndex].x += val;
 			local_sum[localIndex].y += val*val;
-			globalIndex += get_global_size(0);
 		}
 			// Synchronize all work-items in the work-group
 		barrier(CLK_LOCAL_MEM_FENCE);
@@ -236,7 +174,8 @@ std::string kernelCode = R"(
     __kernel void matrix_sat_sat2(
         __global const float2* input, // only sum the real part
         __global float2* sat2, // (sum, sum square)
-        const int width, const int height)
+        const int width, const int height, // region and output
+        const int p_width, const int p_height) // storage dimension of input
     {
 
         int globalIndex = get_global_id(0);
@@ -246,7 +185,8 @@ std::string kernelCode = R"(
         for (int row = globalIndex; row < height; row += get_global_size(0)) {
             // running sum for value and value^2
             float2 sum2 = (float2)(0.0f, 0.0f);
-            int index = row*width;
+            int index = row * p_width;
+            int out_index = row * width;
             // iterative over column
             for (int i=0; i<width; i++) {
                 // get the real part
@@ -254,8 +194,9 @@ std::string kernelCode = R"(
                 // add it to sum2
                 sum2 += (float2)(val, val*val);
                 // assign the current accumulated sum to output
-                sat2[index] = sum2;
+                sat2[out_index] = sum2;
                 index++;
+                out_index++;
             }
         }
         // wait till all sat2
@@ -274,6 +215,7 @@ std::string kernelCode = R"(
                 sat2[index] = sum2;
             }
         }
+        //barrier(CLK_GLOBAL_MEM_FENCE);
 
     } // end of matrix_sat_sat2
 
@@ -283,8 +225,9 @@ std::string kernelCode = R"(
         __global const float2* referenceSum, // (sum, sum square)
         __global const float2* searchSat, //
         const int regionx, const int regiony, // correlation surface region
-        const int window_width, const int window_height,
-        const int search_window_width, const int search_window_height // assume the correlation buffer has the same size as searchWindow
+        const int storage_width, const int storage_height, // matrix size for storing the correlation surface
+        const int window_width, const int window_height, // reference window size
+        const int search_window_width, const int search_window_height // search window size
         )
     {
 
@@ -307,11 +250,17 @@ std::string kernelCode = R"(
         // get search sum and sum square
         float2 search_sum = rb -lb -rt +lt;
         // normalize cor_norm = (cor_un-norm -<reference><search>)/sqrt( <reference^2> -<reference>^2)(...)
-        float size = (float)(window_width*window_height);
-        surface[y*search_window_width+x].x -= reference_sum.x * search_sum.x/size;
-        surface[y*search_window_width+x].x *= rsqrt(
-            (reference_sum.y - reference_sum.x*reference_sum.x/size)
-                *(search_sum.y-search_sum.x*search_sum.x/size)+FLT_EPSILON);
+        float size_recip = native_recip((float)(window_width*window_height));
+        float size_recip2 = native_recip((float)(storage_width*storage_height)); //fft norm
+        // only normalize real part
+        const int index = mad24(y, storage_width, x);
+        float temp = surface[index].x*size_recip2 - reference_sum.x * search_sum.x*size_recip;
+        //printf("debug norm %d %g %g %g %g %g %g\n", index, search_sum.x, reference_sum.x, surface[index].x, temp,
+        //    reference_sum.y, search_sum.y);
+        temp *= native_rsqrt(
+            (reference_sum.y - reference_sum.x*reference_sum.x*size_recip)
+                *(search_sum.y-search_sum.x*search_sum.x*size_recip)+FLT_EPSILON);
+        surface[index].x = temp;
     } // end of correlation_normalize
 
     // find the max (real part) location on an image
@@ -322,22 +271,22 @@ std::string kernelCode = R"(
         __global int2* maxloc, // along (width, height)
         __local float* local_max, // local memory to save max value and location
         __local int* local_maxloc,
-        const int regionx, const int regiony,
-        const int width, const int height)
+        const int width, const int height,
+        const int stride)
 	{
 		int globalIndex = get_global_id(0);
-		int localIndex = get_local_id(0); // should be the same
+		int localIndex = get_local_id(0); // should be the same as globalIndex
         int groupSize = get_local_size(0);
 
 		local_max[localIndex] = 0.0f; // (assume amplitudes are positive)
         local_maxloc[localIndex] = 0;
 
 	    // Compute partial sum in each work-item
-		for (int id = globalIndex; id < regionx*regiony; id += groupSize)
+		for (int id = globalIndex; id < width*height; id += groupSize)
 		{
-            int row = id / regionx;
-            int col = id % regionx;
-		    float val = input[row*width+col].x;
+		    int col = id % width;
+            int row = id / width;
+		    float val = input[mad24(row, stride, col)].x;
 			if(local_max[localIndex] < val) {
 			    local_max[localIndex] = val;
 			    local_maxloc[localIndex] = id;
@@ -362,10 +311,27 @@ std::string kernelCode = R"(
 		}
         // use the thread 0 to return the result
 		if (localIndex == 0) {
-		    maxloc[0].x = local_maxloc[0]%regionx;
-		    maxloc[0].y = local_maxloc[0]/regionx; // (col, row)
+		    maxloc[0].x = local_maxloc[0] % width;
+		    maxloc[0].y = local_maxloc[0] / width; // (col, row)
 		}
 	}
 
+    __kernel void matrix_transpose(
+        const uint rows,
+        const uint cols,
+        __global float2* matrix,
+        __global float2* matrixTranspose)
+    {
+        const uint i = get_global_id(0) << 1;
+        const uint j = get_global_id(1) << 1;
+
+        float4 temp = *(__global float4*)&matrix[mad24(j, cols, i)];
+        float4 temp1 = *(__global float4*)&matrix[mad24(j, cols, i) + cols];
+
+        *(__global float4*)&matrixTranspose[mad24(i, rows, j)] = (float4)(temp.s01, temp1.s01);
+        *(__global float4*)&matrixTranspose[mad24(i, rows, j) + rows] = (float4)(temp.s23, temp1.s23);
+    }
 
 )";
+
+// end of file
