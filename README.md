@@ -11,7 +11,7 @@ This OpenCL implementation follows the CUDA version, [PyCuAmpcor](https://github
 
 ## Installation 
 
-Please download the source code from this [github repo](https:://lijun99.github.com/clAmpcor), and use cmake to build the application. 
+Please download the source code from this [github repo](https://lijun99.github.com/clAmpcor), and use cmake to build the application. 
 
 ### Linux 
 
@@ -30,7 +30,7 @@ Apple only supports OpenCL to 1.2. You may need to copy the OpenCL C++ wrapper t
 ```
     sudo cp include/CL/*.hpp /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk/System/Library/Frameworks/OpenCL.framework/Headers
 ```
-The follow the same instruction as in Linux. 
+Then follow the same instructions as in Linux. 
 
 ### Android 
 
@@ -44,10 +44,10 @@ Grab the libOpenCL.so from the device (pre-built by manufacturers),
 ```
     adb pull /vendor/lib64/libOpenCL.so
 ```
-Please it under android/qualcomm/lib (to replace the current file). 
+Place it under android/qualcomm/lib (to replace the current file). 
 
 #### Build 
-Please modify the `CMakeLists.txt` under `android` directory to specify the correct paths for android sdk and device architectures.  
+Please modify the `CMakeLists.txt` under `android` directory to specify the correct android sdk path and device architectures.  
 
 ```commandline
     cd android 
@@ -84,7 +84,7 @@ If some library is missing when running a program,  use
 
 ## Usage 
 
-In a work directory, where a pair of SLC (Single Look Complex) imagess are located, create a JSON config file, `ampcor.json` following the [example](examples/ampcor.json). Adjust the settings, and run `clAmpcor`.   
+In a work directory, where a pair of SLC (Single Look Complex) images are located, create a JSON config file, `ampcor.json` following the [example](examples/ampcor.json). Adjust the settings, and run `clAmpcor`.   
 
 
 
